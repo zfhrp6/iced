@@ -1,0 +1,7 @@
+[account]
+screen_name= "TWITTER SCREEN NAME"
+app_key= "TWITTER APP KEY"
+app_secret= "TWITTER APP SECRET"
+oauth_token= "TWITTER OAUTH TOKEN"
+oauth_token_secret= "TWITTER OAUTH TOKEN"
+

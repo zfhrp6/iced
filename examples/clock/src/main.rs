@@ -1,7 +1,12 @@
+#[macro_use]
+extern crate serde_derive;
+mod twi;
 use iced::{
-    canvas, executor, Application, Canvas, Color, Command, Container, Element,
-    Length, Point, Settings, Subscription, Vector,
+    button, canvas, executor, text_input, Application, Button, Canvas, Color,
+    Command, Container, Element, Length, Point, Row, Settings, Subscription,
+    Text, TextInput, Vector,
 };
+use iced_native::Column;
 
 pub fn main() {
     Clock::run(Settings {
@@ -10,14 +15,61 @@ pub fn main() {
     })
 }
 
+#[derive(Default)]
+struct Counter {
+    value: i32,
+    increment_button: button::State,
+    decrement_button: button::State,
+    post_button: button::State,
+    text: String,
+    text_state: text_input::State,
+    config: twi::Conf,
+}
+
+impl Counter {
+    fn new() -> Counter {
+        Counter {
+            config: twi::read_conf(),
+            ..Counter::default()
+        }
+    }
+    pub fn update(&mut self, message: ButtonClicked) -> Command<Message> {
+        match message {
+            ButtonClicked::Increment => {
+                self.value += 1;
+            }
+            ButtonClicked::Decrement => {
+                self.value -= 1;
+            }
+            ButtonClicked::Post => twi::hoge(&self.text, &self.config),
+        }
+        Command::none()
+    }
+
+    fn update_text(&mut self, s: String) -> Command<Message> {
+        self.text = s;
+        Command::none()
+    }
+}
+
 struct Clock {
     now: LocalTime,
     clock: canvas::layer::Cache<LocalTime>,
+    counter: Counter,
+}
+
+#[derive(Debug, Clone)]
+enum Message {
+    Tick(chrono::DateTime<chrono::Local>),
+    Clicked(ButtonClicked),
+    TextChanged(String),
 }
 
 #[derive(Debug, Clone, Copy)]
-enum Message {
-    Tick(chrono::DateTime<chrono::Local>),
+enum ButtonClicked {
+    Increment,
+    Decrement,
+    Post,
 }
 
 impl Application for Clock {
@@ -29,6 +81,7 @@ impl Application for Clock {
             Clock {
                 now: chrono::Local::now().into(),
                 clock: canvas::layer::Cache::new(),
+                counter: Counter::new(),
             },
             Command::none(),
         )
@@ -48,27 +101,60 @@ impl Application for Clock {
                     self.clock.clear();
                 }
             }
+            Message::Clicked(button_clicked) => {
+                self.counter.update(button_clicked);
+            }
+            Message::TextChanged(s) => {
+                self.counter.update_text(s);
+            }
         }
 
         Command::none()
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        time::every(std::time::Duration::from_millis(500)).map(Message::Tick)
+        time::every(std::time::Duration::from_millis(100)).map(Message::Tick)
     }
 
     fn view(&mut self) -> Element<Message> {
+        let counter = Row::new()
+            .push(
+                Button::new(
+                    &mut self.counter.increment_button,
+                    Text::new("Increment"),
+                )
+                .on_press(Message::Clicked(ButtonClicked::Increment)),
+            )
+            .push(Text::new(&self.counter.value.to_string()).size(50))
+            .push(
+                Button::new(
+                    &mut self.counter.decrement_button,
+                    Text::new("Decrement"),
+                )
+                .on_press(Message::Clicked(ButtonClicked::Decrement)),
+            )
+            .push(TextInput::new(
+                &mut self.counter.text_state,
+                "hoge",
+                &mut self.counter.text,
+                Message::TextChanged,
+            ))
+            .push(
+                Button::new(&mut self.counter.post_button, Text::new("Post"))
+                    .on_press(Message::Clicked(ButtonClicked::Post)),
+            );
         let canvas = Canvas::new()
             .width(Length::Units(400))
             .height(Length::Units(400))
             .push(self.clock.with(&self.now));
 
-        Container::new(canvas)
+        let a: Element<Message> = Container::new(canvas)
             .width(Length::Fill)
             .height(Length::Fill)
             .center_x()
             .center_y()
-            .into()
+            .into();
+        Column::new().push(counter).push(a).into()
     }
 }
 
